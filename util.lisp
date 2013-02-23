@@ -10,7 +10,6 @@
               `(and list
                     (satisfies ,',name))))))
 
-(defun mklist (x)
-  (if (listp x)
-      x
-      (list x)))
+(define-sum-type option
+  (just value)
+  nothing)

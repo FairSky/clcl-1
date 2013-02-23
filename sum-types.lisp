@@ -42,6 +42,11 @@
        ,slots
        ,@options)))
 
+(defun mklist (x)
+  (if (listp x)
+      x
+      (list x)))
+
 (defun make-sum-type-body (class-name declarations)
   (iter (with (class-name . options) = (ensure-class-name class-name))
         (for (name . body) in (mapcar #'mklist declarations))
