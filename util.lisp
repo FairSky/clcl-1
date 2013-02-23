@@ -13,3 +13,11 @@
 (define-sum-type option
   (just value)
   nothing)
+
+(defmacro with-accessors* ((&rest declarations) &body body)
+  (ematch declarations
+    ((cons (cons obj slots) xs)
+     `(with-accessors ,slots ,obj
+        (with-accessors* ,xs ,@body)))
+    ('nil
+     `(progn . ,body))))

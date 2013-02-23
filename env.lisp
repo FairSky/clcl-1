@@ -1,32 +1,26 @@
 (cl:in-package #:clcl)
 
 (define-sum-type env
-  (ocl-env (symbols-to-types t (make-hash-table :test #'equal))
-           (types-to-symbols t (make-hash-table :test #'equal))))
+  (ocl-env (symbols-to-types t '())))
 
-(defun get-env (env designator)
-  (gethash designator
-           (types-to-symbols-of env)))
-
-(defun augment-env (env x)
+(defun augment-env* (env d x)
   (with-accessors ((tts types-to-symbols-of)
                    (stt symbols-to-types-of))
       env
-    (or (gethash x tts)
-        (let* ((designator (iter (with sym = (make-symbol (string (car (name-of x)))))
-                                 (with cnt = (list sym 0))
-                                 (if (not (get-env env cnt))
-                                     (return cnt))
-                                 (incf (second cnt))))
-               (stt (copy-hash-table stt))
-               (tts (copy-hash-table tts)))
-          (setf (gethash designator stt) x)
-          (setf (gethash x tts) designator)         
-          (values (make-instance 'ocl-env
-                                 :types-to-symbols tts
-                                 :symbols-to-types stt)
-                  designator)))))
+    (values (make-instance 'ocl-env
+                           :symbols-to-types (list* (cons d x) stt))
+            d)))
 
-(defun get-env-or-die (env designator)
-  (or (get-env env designator)
-      (error "Undefined variable binding ~S" designator)))
+(defun get-env-by-symbol (env d)
+  (cdr (assoc d (symbols-to-types-of env))))
+
+(defun get-env-by-type (env d)
+  (car (find d (symbols-to-types-of env) :key #'cdr)))
+
+(defun augment-env (env x &aux (name (string (car (name-of x)))))
+  (augment-env* env
+                (iter (with sym = (make-symbol name))
+                      (with cnt = (list sym 1))
+                      (if (not (get-env-by-symbol env cnt))
+                          (return cnt))
+                      (incf (second cnt))) x))

@@ -1,11 +1,11 @@
 (cl:in-package #:clcl)
 
 (define-sum-type unify-state
-  (unified aliases visited)
-  (unify-error place expr)
-  (occurs-check place expr visited))
+  (unified aliases visited env)
+  (unify-error place expr env)
+  (occurs-check place expr visited env))
 
-(defgeneric unify-types (env place expr state))
+(defgeneric unify-types (place expr state))
 
 (defun visited-check (place expr state)
   (match state
@@ -37,37 +37,32 @@
          ))
     (x x)))
 
-(defmethod unify-types :around ((env ocl-env)
-                                (place ocl-type)
+(defmethod unify-types :around ((place ocl-type)
                                 (expr ocl-type)
                                 (state unify-state))
   (setf state (visited-check place expr state))
   (if (typep state 'unified)
-      (call-next-method env
-                        (maybe-resolve-var state place)
+      (call-next-method (maybe-resolve-var state place)
                         (maybe-resolve-var state expr)
                         state)
       state))
 
-(defmethod unify-types ((env ocl-env)
-                        (place ocl-type)
+(defmethod unify-types ((place ocl-type)
                         (expr ocl-type)
                         (state unify-state))
   (make-instance 'unify-error :place place :expr expr))
 
-(defmacro define-unification ((type-name env-name place-name expr-name state)
+(defmacro define-unification ((type-name place-name expr-name state)
                               &body body)
-  `(defmethod unify-types ((,env-name ocl-env)
-                           (,place-name ,type-name)
+  `(defmethod unify-types ((,place-name ,type-name)
                            (,expr-name ,type-name)
                            (,state unify-state))
      ,@body))
 
-(define-unification (native-type env place expr state)
+(define-unification (native-type place expr state)
   (equal (name-of place) (name-of expr)))
 
-(defmethod unify-types ((env ocl-env)
-                        (place variable-type)
+(defmethod unify-types ((place variable-type)
                         (expr ocl-type)
                         (state unify-state))
     (make-instance 'unified
@@ -75,17 +70,50 @@
                                    (aliases-of state))
                    :visited (visited-of state)))
 
-(defmethod unify-types ((env ocl-env)
-                        (place ocl-type)
+(defmethod unify-types ((place ocl-type)
                         (expr variable-type)
                         (state unify-state))
   (make-instance 'unify-error :place place :expr expr))
 
-(define-unification (variable-type env place expr state)
+(define-unification (variable-type place expr state)
   (make-instance 'unified
                  :aliases (list* (cons place expr)
                                  (cons expr place)
                                  (aliases-of state))
                  :visited (visited-of state)))
 
+(defun reduce-state-fn (seed f places exprs)
+  (iter (with seed = seed)
+        (for p in places)
+        (for e in exprs)
+        (if (not (typep seed 'unified))
+            (return seed))
+        (setf seed (funcall f p e seed))
+        (finally (return seed))))
 
+(defmacro reduce-state (seed &rest fn-and-list-pairs)
+  (multiple-value-ematch (values seed fn-and-list-pairs)
+    ((_ '())
+     seed)
+    ((seed (list* f places exprs xs))
+     (with-unique-names (seed-name)
+       `(let ((,seed-name (reduce-state-fn ,seed ,f ,places ,exprs)))
+          (if (typep ,seed-name 'unified)
+              (reduce-state ,seed-name . ,xs)
+              ,seed-name))))))
+
+(define-unification (user-type place expr state)
+  (with-accessors* ((place (pfkind free-kind-of)
+                           (pnames member-names-of)
+                           (ptypes list-of-types))
+                    (expr (efkind free-kind-of)
+                          (enames member-names-of)
+                          (etypes list-of-types)))
+    (if (and (= (length pfkind)
+                (length efkind))
+             (= (length pnames)
+                (length enames)))
+        (reduce-state state
+          #'equal pnames enames
+          #'unify-types ptypes etypes
+          #'unify-types ptypes etypes))))
