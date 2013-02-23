@@ -20,4 +20,13 @@
           (values (make-instance 'ocl-env
                                  :gensym-counter (1+ g)
                                  :types-to-symbols tts
-                                 :symbols-to-types stt) designator)))))
+                                 :symbols-to-types stt)
+                  designator)))))
+
+(defun get-env (env designator)
+  (gethash designator
+           (types-to-symbols-of env)))
+
+(defun get-env-or-die (env designator)
+  (or (get-env env designator)
+      (error "Undefined variable binding ~S" designator)))
