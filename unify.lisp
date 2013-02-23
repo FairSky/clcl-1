@@ -5,7 +5,7 @@
   (unify-error place expr)
   (occurs-check place expr visited))
 
-(defgeneric unify-same-types (env place expr state))
+(defgeneric unify-types (env place expr state))
 
 (defun visited-check (place expr state)
   (match state
@@ -18,28 +18,74 @@
                         :visited (list* (list place expr) visited))))
     (x x)))
 
-(defmacro define-unification ((type-name env-name place-name expr-name visited-name)
+(defun resolve-var (state name seen)
+  (match state
+    ((class unified)
+     (with-accessors ((aliases aliases-of)) state
+       (if (position name seen :test #'equal)
+           nil
+           (match (cdr (find name aliases :key #'car))
+             ((and name (type variable-type))
+              (resolve-var state name (list* name seen)))
+             (x x)))))
+    (_ nil)))
+
+(defun maybe-resolve-var (state type)
+  (match type
+    ((class variable-type)
+     (or (resolve-var state type '())
+         ))
+    (x x)))
+
+(defmethod unify-types :around ((env ocl-env)
+                                (place ocl-type)
+                                (expr ocl-type)
+                                (state unify-state))
+  (setf state (visited-check place expr state))
+  (if (typep state 'unified)
+      (call-next-method env
+                        (maybe-resolve-var state place)
+                        (maybe-resolve-var state expr)
+                        state)
+      state))
+
+(defmethod unify-types ((env ocl-env)
+                        (place ocl-type)
+                        (expr ocl-type)
+                        (state unify-state))
+  (make-instance 'unify-error :place place :expr expr))
+
+(defmacro define-unification ((type-name env-name place-name expr-name state)
                               &body body)
-  `(defmethod unify-same-types (,env-name
-                                (,place-name ,type-name)
-                                (,expr-name ,type-name)
-                                (,visited-name t))
-     (visited-check ,place-name ,expr-name ,visited-name)
+  `(defmethod unify-types ((,env-name ocl-env)
+                           (,place-name ,type-name)
+                           (,expr-name ,type-name)
+                           (,state unify-state))
      ,@body))
 
-(defun resolve-var (env name seen)
-  (if (position name seen :test #'equal)
-      nil
-      (ematch (get-env env name)
-        ((and name (type variable-type))
-         (resolve-var env name (list* name seen)))
-        (x x))))
-
-(define-unification (native-type env place expr visited)
+(define-unification (native-type env place expr state)
   (equal (name-of place) (name-of expr)))
 
-(define-unification (variable-type env place expr visited)
-  )
+(defmethod unify-types ((env ocl-env)
+                        (place variable-type)
+                        (expr ocl-type)
+                        (state unify-state))
+    (make-instance 'unified
+                   :aliases (list* (cons place expr)
+                                   (aliases-of state))
+                   :visited (visited-of state)))
 
-(defun unify (env place expr visited)
-  )
+(defmethod unify-types ((env ocl-env)
+                        (place ocl-type)
+                        (expr variable-type)
+                        (state unify-state))
+  (make-instance 'unify-error :place place :expr expr))
+
+(define-unification (variable-type env place expr state)
+  (make-instance 'unified
+                 :aliases (list* (cons place expr)
+                                 (cons expr place)
+                                 (aliases-of state))
+                 :visited (visited-of state)))
+
+
