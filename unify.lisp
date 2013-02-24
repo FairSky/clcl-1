@@ -1,7 +1,7 @@
 (cl:in-package #:clcl)
 
 (define-sum-type unify-state (env)
-  (unified aliases visited)
+  (unified aliases-place aliases-expr visited)
   (unify-error place expr)
   (occurs-check place expr visited))
 
@@ -9,32 +9,38 @@
 
 (defun visited-check (place expr state)
   (match state
-    ((class unified visited aliases)
+    ((class unified visited aliases-place aliases-expr)
      (if (not (position (list place expr) (visited-of state)  :key #'equal))
-         (make-instance 'unified :aliases aliases :visited visited)
+         (make-instance 'unified
+                        :aliases-place aliases-place
+                        :aliases-expr aliases-expr
+                        :visited visited)
          (make-instance 'occurs-check
                         :place place
                         :expr expr
                         :visited (list* (list place expr) visited))))
     (x x)))
 
-(defun resolve-var (state name seen)
+(defun resolve-var (state name seen placep)
   (match state
     ((class unified)
-     (with-accessors ((aliases aliases-of)) state
+     (with-accessors ((ap aliases-place-of)
+                      (ae aliases-expr-of))
+         state
        (if (position name seen :test #'equal)
            nil
-           (iter (for (name2 . dest) in aliases)
+           (iter (with aliases = (if placep ap ae))
+                 (for (name2 . dest) in aliases)
                  (if (equal name name2)
-                     (let ((ret (resolve-var state dest (list* dest seen))))
+                     (let ((ret (resolve-var state dest (list* dest seen) placep)))
                        (and ret (return ret))))))))
     (_ nil)))
 
-(defun maybe-resolve-var (state type)
+(defun maybe-resolve-var (state type placep)
   (match type
     ((class variable-type)
-     (or (resolve-var state type '())
-         ))
+     (or (resolve-var state type '() placep)
+         type))
     (x x)))
 
 (defmethod unify-types :around ((place ocl-type)
@@ -42,8 +48,8 @@
                                 (state unify-state))
   (setf state (visited-check place expr state))
   (if (typep state 'unified)
-      (call-next-method (maybe-resolve-var state place)
-                        (maybe-resolve-var state expr)
+      (call-next-method (maybe-resolve-var state place t)
+                        (maybe-resolve-var state expr nil)
                         state)
       state))
 
@@ -66,8 +72,9 @@
                         (expr ocl-type)
                         (state unify-state))
     (make-instance 'unified
-                   :aliases (list* (cons place expr)
-                                   (aliases-of state))
+                   :aliases-place (list* (cons place expr)
+                                         (aliases-place-of state))
+                   :aliases-expr (aliases-expr-of state)
                    :visited (visited-of state)))
 
 (defmethod unify-types ((place ocl-type)
@@ -77,9 +84,10 @@
 
 (define-unification (variable-type place expr state)
   (make-instance 'unified
-                 :aliases (list* (cons place expr)
-                                 (cons expr place)
-                                 (aliases-of state))
+                 :aliases-place (list* (cons place expr)
+                                       (aliases-place-of state))
+                 :aliases-expr (list* (cons expr place)
+                                      (aliases-expr-of state))
                  :visited (visited-of state)))
 
 (defun reduce-state-fn (seed f places exprs)
@@ -135,6 +143,45 @@
                        :place place
                        :expr expr
                        :env (env-of state)))))
+
+(defgeneric apply-type (type type-to-bind var-to-bind))
+
+(defmethod apply-type ((type native-type) (type-to-bind ocl-type) var-to-bind)
+  nil)
+
+(defmethod apply-type ((type variable-type) (type-to-bind ocl-type) var-to-bind)
+  (if (equal (name-of type) var-to-bind)
+      type-to-bind
+      nil))
+
+(defun apply-some-type (type type-to-bind var-to-bind)
+  (let ((pos (position var-to-bind
+                       (free-kind-of type)
+                       :test #'equal)))
+    (and pos
+         (make-instance 'user-type
+                        :member-types (mapcar (lambda (old)
+                                                (or (apply-type old
+                                                                type
+                                                                var-to-bind)
+                                                    old))
+                                              (member-types-of type))
+                        :free-kind (remove var-to-bind (free-kind-of type))
+                        :member-names (member-names-of type)))))
+
+(defmethod apply-type ((type user-type) (type-to-bind ocl-type) var-to-bind)
+  (apply-some-type type type-to-bind var-to-bind))
+
+(defmethod apply-type ((type function-type) (type-to-bind ocl-type) var-to-bind)
+  (apply-some-type type type-to-bind var-to-bind))
+
+(defmethod apply-type ((type functor) (type-to-bind ocl-type) var-to-bind)
+  (apply-some-type type type-to-bind var-to-bind))
+
+(defmethod apply-type ((type dimension) (type-to-bind dimension) var-to-bind)
+  (and (eql type type-to-bind)
+       type-to-bind))
+
 
 
 
