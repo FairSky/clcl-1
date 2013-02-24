@@ -14,7 +14,8 @@
          (make-instance 'unified
                         :aliases-place aliases-place
                         :aliases-expr aliases-expr
-                        :visited visited)
+                        :visited visited
+                        :env (env-of state))
          (make-instance 'occurs-check
                         :place place
                         :expr expr
@@ -75,7 +76,8 @@
                  :aliases-place (list* (cons place expr)
                                        (aliases-place-of state))
                  :aliases-expr (aliases-expr-of state)
-                 :visited (visited-of state)))
+                 :visited (visited-of state)
+                 :env (env-of state)))
 
 (defmethod unify-types ((place ocl-type)
                         (expr variable-type)
@@ -90,7 +92,8 @@
                                            (aliases-place-of state))
                      :aliases-expr (list* (cons expr place)
                                           (aliases-expr-of state))
-                     :visited (visited-of state))))
+                     :visited (visited-of state)
+                     :env (env-of state))))
 
 (defun reduce-state-fn (seed f places exprs)
   (iter (with seed = seed)

@@ -6,7 +6,8 @@
 
 (defun augment-env* (env d x)
   (make-instance 'ocl-env
-                 :lexenv (fset:with (lexenv-of env) d x)))
+                 :lexenv (fset:with (lexenv-of env) d x)
+                 :global-names (fset:with (lexenv-of env) d x)))
 
 (defun get-type-by-symbol (env d)
   (lookup (lexenv-of env) d))

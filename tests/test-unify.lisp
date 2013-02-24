@@ -4,7 +4,8 @@
 (defvar *env*)
 
 (defmacro with-ocl-env (&body body)
-  `(let ((*env* (make-instance 'ocl-env)))
+  `(let ((*env* (ocl-env (fset:empty-map)
+                         (fset:empty-map))))
      ,@body))
 
 (defun unify (place expr)
@@ -47,7 +48,19 @@
 
 (test simple
   (with-ocl-env
-    (unify-success (variable-type 'foo) (dimension 42 'array-rank))
-    (unify-success (variable-type 'foo) (variable-type 'foo))))
+   (unify-success (variable-type 'foo) (dimension 42 'array-rank))
+   (unify-success (variable-type 'foo) (variable-type 'foo))
+   (unify-failure (dimension 42 'array-rank) (variable-type 'foo))
+   (let* ((foo (function-type '()
+                              #1=(list (variable-type 'foo)
+                                       (variable-type 'bar))
+                              #1#
+                              (list 'foo 0)))
+          (bar (function-type '()
+                              (list (variable-type 'xenu))
+                              (list foo)
+                              (list 'bar 0))))
+     (unify-failure foo bar)
+     (unify-failure bar foo))))
 
 (run!)
