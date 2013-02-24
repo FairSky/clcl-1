@@ -10,7 +10,7 @@
 (defun visited-check (place expr state)
   (match state
     ((class unified visited aliases-place aliases-expr)
-     (if (not (position (list place expr) (visited-of state)  :key #'equal))
+     (if (not (position (list place expr) (visited-of state) :key #'equal))
          (make-instance 'unified
                         :aliases-place aliases-place
                         :aliases-expr aliases-expr
