@@ -20,6 +20,8 @@
     (values (augment-env* env d x) d)))
 
 (defun add-global-name (env string symbol)
-  (fset:with (global-names-of env)
-             string
-             (list symbol 0)))
+  (let ((foo (list symbol 0)))
+    (values (fset:with (global-names-of env)
+                       string
+                       foo)
+            foo)))

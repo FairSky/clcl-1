@@ -166,10 +166,10 @@
                        :env (env-of state)))))
 
 (defun unify-something-with-functor (place expr state)
-  (if  (= (length (free-kind-of place))
-          (length (free-kind-of expr)))
-       (= (length (member-names-of place))
-          (length (member-names-of (inner-type-of expr))))
+  (if  (and (= (length (free-kind-of place))
+               (length (free-kind-of expr)))
+            (= (length (member-names-of place))
+               (length (member-names-of (inner-type-of expr)))))
        (unify-types place (inner-type-of expr))
        (make-instance 'unify-error
                       :place place
