@@ -28,12 +28,17 @@
     (symbol (values class-name '()))))
 
 (defun print-sum-type (obj stream)
-  (write-char #\( stream)
-  (write (class-name (class-of obj)) :stream stream)
-  (dolist (i (class-slots (class-of obj)))
-    (let ((i (slot-definition-name i)))
-      (format stream " ~A = ~A;" (string-downcase i) (and (slot-boundp obj i) (slot-value obj i)))))
-  (write-char #\) stream)
+  (let ((*print-case* :downcase)
+        (*print-circle* t))
+    (write (list* (class-name (class-of obj))
+                  (mappend (lambda (i)
+                             (list (slot-definition-name i)
+                                   (and (slot-boundp obj (slot-definition-name i))
+                                        (slot-value obj (slot-definition-name i)))))
+                           (class-slots (class-of obj))))
+           :stream stream
+           :pretty t
+           :length 78))
   nil)
 
 (defun parse-record-slots (body)
