@@ -25,7 +25,7 @@
 (define-list-predicate list-of-types type-designator)
 (define-list-predicate list-of-vars variable-type)
 
-(define-sum-type expr-repr
+(define-sum-type expr-repr ()
   infix
   prefix
   postfix

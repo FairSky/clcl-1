@@ -10,7 +10,7 @@
 (defun visited-check (place expr state)
   (match state
     ((class unified visited aliases)
-     (if (not (position (list place expr) state :key #'equal))
+     (if (not (position (list place expr) (visited-of state)  :key #'equal))
          (make-instance 'unified :aliases aliases :visited visited)
          (make-instance 'occurs-check
                         :place place
@@ -115,5 +115,26 @@
                 (length enames)))
         (reduce-state state
           #'equal pnames enames
-          #'unify-types ptypes etypes
-          #'unify-types ptypes etypes))))
+          #'unify-types ptypes etypes)
+        (make-instance 'unify-error
+                       :place place
+                       :expr expr
+                       :env (env-of state)))))
+
+(define-unification (function-type place expr state)
+  (with-accessors* ((place (pkinds free-kind-of)
+                           (ptypes member-types-of))
+                    (expr (ekinds free-kind-of)
+                          (etypes member-types-of)))
+    (if (and (= (length pkinds)
+                (length ekinds))
+             (= (length ptypes)
+                (length etypes)))
+        (reduce-state state #'unify-types ptypes etypes)
+        (make-instance 'unify-error
+                       :place place
+                       :expr expr
+                       :env (env-of state)))))
+
+
+
