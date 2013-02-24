@@ -18,4 +18,16 @@
                           #:substitute #:substitute-if #:substitute-if-not
                           #:some #:every #:notany #:notevery
                           #:appendf #:removef #:unionf #:compose)
-  (:shadowing-import-from #:iterate #:with))
+  (:shadowing-import-from #:iterate #:with)
+  (:export #:unify-types
+           #:ocl-type
+           #:native-type
+           #:variable-type
+           #:user-type
+           #:function-type
+           #:functor
+           #:dimension
+           #:unified
+           #:unify-error
+           #:occurs-check
+           #:unify-state))
