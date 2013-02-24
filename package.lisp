@@ -30,4 +30,5 @@
            #:unified
            #:unify-error
            #:occurs-check
-           #:unify-state))
+           #:unify-state
+           #:ocl-env))

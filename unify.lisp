@@ -71,11 +71,11 @@
 (defmethod unify-types ((place variable-type)
                         (expr ocl-type)
                         (state unify-state))
-    (make-instance 'unified
-                   :aliases-place (list* (cons place expr)
-                                         (aliases-place-of state))
-                   :aliases-expr (aliases-expr-of state)
-                   :visited (visited-of state)))
+  (make-instance 'unified
+                 :aliases-place (list* (cons place expr)
+                                       (aliases-place-of state))
+                 :aliases-expr (aliases-expr-of state)
+                 :visited (visited-of state)))
 
 (defmethod unify-types ((place ocl-type)
                         (expr variable-type)
@@ -83,12 +83,14 @@
   (make-instance 'unify-error :place place :expr expr))
 
 (define-unification (variable-type place expr state)
-  (make-instance 'unified
-                 :aliases-place (list* (cons place expr)
-                                       (aliases-place-of state))
-                 :aliases-expr (list* (cons expr place)
-                                      (aliases-expr-of state))
-                 :visited (visited-of state)))
+  (if (equal (name-of place) (name-of expr))
+      state
+      (make-instance 'unified
+                     :aliases-place (list* (cons place expr)
+                                           (aliases-place-of state))
+                     :aliases-expr (list* (cons expr place)
+                                          (aliases-expr-of state))
+                     :visited (visited-of state))))
 
 (defun reduce-state-fn (seed f places exprs)
   (iter (with seed = seed)

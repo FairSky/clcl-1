@@ -1,6 +1,5 @@
-(asdf:defsystem clcl
-  :depends-on (#:fiveam #:clcl)
+(asdf:defsystem :clcl-tests
+  :depends-on (#:fiveam :clcl)
   :serial t
-  :components
-  (:file "tests/test-package")
-  (:file "tests/test-unify"))
+  :components ((:file "test-package")
+               (:file "test-unify")))
