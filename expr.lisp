@@ -19,7 +19,8 @@
   (functor (free-kind list-of-types)
            (free-vars list-of-vars)
            (member-names list-of-vars)
-           (member-types list-of-types))
+           (member-types list-of-types)
+           (inner-type ocl-type))
   (dimension (int (integer 1))))
 
 (define-list-predicate list-of-names name-designator)

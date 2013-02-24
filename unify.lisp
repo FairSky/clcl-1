@@ -6,6 +6,7 @@
   (occurs-check place expr visited))
 
 (defgeneric unify-types (place expr state))
+(defgeneric apply-type (type type-to-bind var-to-bind))
 
 (defun visited-check (place expr state)
   (match state
@@ -144,44 +145,51 @@
                        :expr expr
                        :env (env-of state)))))
 
-(defgeneric apply-type (type type-to-bind var-to-bind))
+(defmethod unify-types ((place ocl-type) (expr functor) state)
+  (iter (for var in (member-types-of ))))
 
 (defmethod apply-type ((type native-type) (type-to-bind ocl-type) var-to-bind)
   nil)
 
 (defmethod apply-type ((type variable-type) (type-to-bind ocl-type) var-to-bind)
-  (if (equal (name-of type) var-to-bind)
-      type-to-bind
-      nil))
+  (and (equal var-to-bind (name-of type))
+       type-to-bind))
 
 (defun apply-some-type (type type-to-bind var-to-bind)
   (let ((pos (position var-to-bind
                        (free-kind-of type)
                        :test #'equal)))
     (and pos
-         (make-instance 'user-type
-                        :member-types (mapcar (lambda (old)
-                                                (or (apply-type old
-                                                                type
-                                                                var-to-bind)
-                                                    old))
-                                              (member-types-of type))
-                        :free-kind (remove var-to-bind (free-kind-of type))
-                        :member-names (member-names-of type)))))
+         (list :free-kind (remove var-to-bind (free-kind-of type))
+               :member-names (member-names-of type)
+               :member-types (mapcar (lambda (old)
+                                       (or (apply-type old
+                                                       type
+                                                       var-to-bind)
+                                           old))
+                                     (member-types-of type))))))
 
 (defmethod apply-type ((type user-type) (type-to-bind ocl-type) var-to-bind)
-  (apply-some-type type type-to-bind var-to-bind))
+  (let ((foo (apply-some-type type type-to-bind var-to-bind)))
+    (and foo (apply #'make-instance 'user-type foo))))
 
 (defmethod apply-type ((type function-type) (type-to-bind ocl-type) var-to-bind)
-  (apply-some-type type type-to-bind var-to-bind))
+  (let ((foo (apply-some-type type type-to-bind var-to-bind)))
+    (and foo (apply #'make-instance 'function-type foo))))
 
 (defmethod apply-type ((type functor) (type-to-bind ocl-type) var-to-bind)
-  (apply-some-type type type-to-bind var-to-bind))
+  (let ((foo (apply-some-type type type-to-bind var-to-bind)))
+    (and foo
+         (let ((bar (apply-type (inner-type-of type) type-to-bind var-to-bind)))
+           (and bar
+                (apply #'make-instance
+                       'functor
+                       foo
+                       :inner-type bar
+                       :free-vars (remove type-to-bind
+                                          (free-vars-of type)
+                                          :test #'equal)))))))
 
 (defmethod apply-type ((type dimension) (type-to-bind dimension) var-to-bind)
-  (and (eql type type-to-bind)
+  (and (eql (int-of type) (int-of type-to-bind))
        type-to-bind))
-
-
-
-
