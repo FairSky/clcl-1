@@ -19,7 +19,7 @@
          (make-instance 'occurs-check
                         :place place
                         :expr expr
-                        :visited (list* (list place expr) visited))))
+                        :visited visited)))
     (x x)))
 
 (defun resolve-var (state name seen placep)

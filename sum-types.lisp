@@ -29,7 +29,8 @@
 
 (defun print-sum-type (obj stream)
   (let ((*print-case* :downcase)
-        (*print-circle* t))
+        (*print-circle* t)
+        (*print-escape* nil))
     (write (list* (class-name (class-of obj))
                   (mappend (lambda (i)
                              (list (slot-definition-name i)
