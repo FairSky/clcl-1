@@ -16,12 +16,33 @@
   x)
 
 (defun unify-success (place expr)
+  (fresh-line)
+  (write 'unifying-and-expecting-success)
+  (terpri)
+  (write place)
+  (terpri)
+  (write expr)
+  (terpri)
   (is (typep (print-id (unify place expr)) 'unified)))
 
 (defun unify-failure (place expr)
+  (fresh-line)
+  (write 'unifying-and-expecting-failure)
+  (terpri)
+  (write place)
+  (terpri)
+  (write expr)
+  (terpri)
   (is (typep (print-id (unify place expr)) 'unify-error)))
 
 (defun unify-loop (place expr)
+  (fresh-line)
+  (write 'unifying-and-expecting-occurs-check)
+  (terpri)
+  (write place)
+  (terpri)
+  (write expr)
+  (terpri)
   (is (typep (print-id (unify place expr)) 'occurs-check)))
 
 (test simple
