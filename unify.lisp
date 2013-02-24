@@ -1,9 +1,9 @@
 (cl:in-package #:clcl)
 
-(define-sum-type unify-state
-  (unified aliases visited env)
-  (unify-error place expr env)
-  (occurs-check place expr visited env))
+(define-sum-type unify-state (env)
+  (unified aliases visited)
+  (unify-error place expr)
+  (occurs-check place expr visited))
 
 (defgeneric unify-types (place expr state))
 
@@ -24,10 +24,10 @@
      (with-accessors ((aliases aliases-of)) state
        (if (position name seen :test #'equal)
            nil
-           (match (cdr (find name aliases :key #'car))
-             ((and name (type variable-type))
-              (resolve-var state name (list* name seen)))
-             (x x)))))
+           (iter (for (name2 . dest) in aliases)
+                 (if (equal name name2)
+                     (let ((ret (resolve-var state dest (list* dest seen))))
+                       (and ret (return ret))))))))
     (_ nil)))
 
 (defun maybe-resolve-var (state type)

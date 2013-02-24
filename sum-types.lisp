@@ -25,20 +25,23 @@
 
 (defun ensure-class-name (class-name)
   (etypecase class-name
-    ((cons symbol t) class-name)
-    (symbol (cons class-name '()))))
+    ((cons symbol (cons t null)) (values-list class-name))
+    (symbol (values class-name '()))))
+
+(defun parse-record-slots (body class-name)
+  (iter (for var-decl in (mklist body))
+        (for (var type initform) = (ensure-var var-decl))
+        (collect `(,var :type ,type
+                        :reader ,(bastardize-symbol var)
+                        :initarg ,(intern (symbol-name var) '#:keyword)
+                        :initform ,(if (null initform)
+                                       `(need-arg ',var ',class-name)
+                                       initform)))))
 
 (defun parse-sum-record (class-name parent body)
-  (let* ((slots (iter (for var-decl in body)
-                      (for (var type initform) = (ensure-var var-decl))
-                      (collect `(,var :type ,type
-                                      :reader ,(bastardize-symbol var)
-                                      :initarg ,(intern (symbol-name var) '#:keyword)
-                                      :initform ,(if (null initform)
-                                                     `(need-arg ',var ',class-name)
-                                                     initform)))))
-         ((class-name . options) (ensure-class-name class-name)))
-    `(defclass ,class-name (,parent)
+  (let* ((slots (parse-record-slots body class-name))
+         ((:mval class-name options) (ensure-class-name class-name)))
+    `(defclass ,class-name ,(if parent `(,parent) '())
        ,slots
        ,@options)))
 
@@ -47,13 +50,13 @@
       x
       (list x)))
 
-(defun make-sum-type-body (class-name declarations)
-  (iter (with (class-name . options) = (ensure-class-name class-name))
-        (for (name . body) in (mapcar #'mklist declarations))
-        (collect (parse-sum-record name class-name body) into slots)
-        (finally (return `(progn (defclass ,class-name () () . ,options)
-                                 ,@slots
-                                 ',class-name)))))
+(defun make-sum-type-body (class-name class-declarations declarations)
+  (let* (((:mval class-name options) (ensure-class-name class-name)))
+    (iter (for (name . body) in (mapcar #'mklist declarations))
+          (collect (parse-sum-record name class-name body) into slots)
+          (finally (return `(progn (defclass ,class-name () ,(parse-record-slots class-declarations class-name) . ,options)
+                                   ,@slots
+                                   ',class-name))))))
 
-(defmacro define-sum-type (class-name &body declarations)
-  (make-sum-type-body class-name declarations))
+(defmacro define-sum-type (class-name class-declarations &body declarations)
+  (make-sum-type-body class-name class-declarations declarations))

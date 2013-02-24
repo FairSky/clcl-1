@@ -6,27 +6,24 @@
 (deftype name-designator ()
   'symbol)
 
+(define-sum-type ocl-type
+    ((name type-designator))
+  (native-type)
+  (variable-type)
+  (user-type (free-kind list-of-vars)
+             (member-names list-of-names)
+             (member-types list-of-types))
+  (function-type (free-kind list-of-vars)
+                 (member-names list-of-names)
+                 (member-types list-of-types))
+  (functor (free-kind list-of-vars)
+           (free-vars list-of-vars))
+  (dimension (int (integer 1)))
+  (dimension-variable))
+
 (define-list-predicate list-of-names name-designator)
 (define-list-predicate list-of-types type-designator)
 (define-list-predicate list-of-vars variable-type)
-
-(define-sum-type ocl-type
-  (native-type (name type-designator))
-  (variable-type (name type-designator))
-  (user-type (name type-designator)
-             (free-kind list-of-vars)
-             (member-names list-of-names)
-             (member-types list-of-types))
-  (function-type (name type-designator)
-                 (free-kind list-of-vars)
-                 (member-names list-of-names)
-                 (member-types list-of-types))
-  (functor (name type-designator)
-           (free-kind list-of-vars)
-           (free-vars list-of-vars))
-  (dimension (name type-designator)
-             (int (integer 1)))
-  (dimension-variable (name type-designato)))
 
 (define-sum-type expr-repr
   infix
