@@ -6,7 +6,6 @@
   (occurs-check place expr visited))
 
 (defgeneric unify-types (place expr state))
-(defgeneric apply-type (type type-to-bind var-to-bind))
 
 (defun visited-check (place expr state)
   (match state
@@ -68,6 +67,10 @@
 
 (define-unification (native-type place expr state)
   (equal (name-of place) (name-of expr)))
+
+(defmethod unify-types ((place ocl-type)
+                        (expr ocl-type)
+                        (state unify-state)))
 
 (defmethod unify-types ((place variable-type)
                         (expr ocl-type)
@@ -145,51 +148,36 @@
                        :expr expr
                        :env (env-of state)))))
 
-(defmethod unify-types ((place ocl-type) (expr functor) state)
-  (iter (for var in (member-types-of ))))
+(define-unification (functor place expr state)
+  (with-accessors* ((place (pktypes free-kind-of)
+                           (pkvars free-vars-of)
+                           (pinner inner-type-of))
+                    (place (ektypes free-kind-of)
+                           (ekvars free-vars-of)
+                           (einner inner-type-of)))
+    (if (and (= (length pktypes)
+                (length ektypes)))
+        (reduce-state state
+                      #'unify-types pktypes ektypes
+                      #'unify-types (list pinner) (list einner))
+        (make-instance 'unify-error
+                       :place place
+                       :expr expr
+                       :env (env-of state)))))
 
-(defmethod apply-type ((type native-type) (type-to-bind ocl-type) var-to-bind)
-  nil)
+(defun unify-something-with-functor (place expr state)
+  (if  (= (length (free-kind-of place))
+          (length (free-kind-of expr)))
+       (= (length (member-names-of place))
+          (length (member-names-of (inner-type-of expr))))
+       (unify-types place (inner-type-of expr))
+       (make-instance 'unify-error
+                      :place place
+                      :expr expr
+                      :env (env-of state))))
 
-(defmethod apply-type ((type variable-type) (type-to-bind ocl-type) var-to-bind)
-  (and (equal var-to-bind (name-of type))
-       type-to-bind))
+(defmethod unify-types ((place user-type) (expr functor) state)
+  (unify-something-with-functor place expr state))
 
-(defun apply-some-type (type type-to-bind var-to-bind)
-  (let ((pos (position var-to-bind
-                       (free-kind-of type)
-                       :test #'equal)))
-    (and pos
-         (list :free-kind (remove var-to-bind (free-kind-of type))
-               :member-names (member-names-of type)
-               :member-types (mapcar (lambda (old)
-                                       (or (apply-type old
-                                                       type
-                                                       var-to-bind)
-                                           old))
-                                     (member-types-of type))))))
-
-(defmethod apply-type ((type user-type) (type-to-bind ocl-type) var-to-bind)
-  (let ((foo (apply-some-type type type-to-bind var-to-bind)))
-    (and foo (apply #'make-instance 'user-type foo))))
-
-(defmethod apply-type ((type function-type) (type-to-bind ocl-type) var-to-bind)
-  (let ((foo (apply-some-type type type-to-bind var-to-bind)))
-    (and foo (apply #'make-instance 'function-type foo))))
-
-(defmethod apply-type ((type functor) (type-to-bind ocl-type) var-to-bind)
-  (let ((foo (apply-some-type type type-to-bind var-to-bind)))
-    (and foo
-         (let ((bar (apply-type (inner-type-of type) type-to-bind var-to-bind)))
-           (and bar
-                (apply #'make-instance
-                       'functor
-                       foo
-                       :inner-type bar
-                       :free-vars (remove type-to-bind
-                                          (free-vars-of type)
-                                          :test #'equal)))))))
-
-(defmethod apply-type ((type dimension) (type-to-bind dimension) var-to-bind)
-  (and (eql (int-of type) (int-of type-to-bind))
-       type-to-bind))
+(defmethod unify-types ((place function-type) (expr functor) state)
+  (unify-something-with-functor place expr state))
