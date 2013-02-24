@@ -77,4 +77,10 @@
      (unify-success foo bar)
      (unify-failure bar foo))))
 
+(test cycles
+  (with-ocl-env
+    (let* ((bar (function-type '() '() '() 'cyclic)))
+      (reinitialize-instance bar :member-types (list bar) :member-names (list (variable-type 'cycles-r-us)))
+      (unify-loop bar bar))))
+
 (run!)

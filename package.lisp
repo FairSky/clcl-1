@@ -23,7 +23,7 @@
            #:ocl-type
            #:native-type
            #:variable-type
-           #:user-type
+           #:module
            #:function-type
            #:functor
            #:dimension

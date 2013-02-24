@@ -10,11 +10,11 @@
 (defun visited-check (place expr state)
   (match state
     ((class unified visited aliases-place aliases-expr)
-     (if (not (position (list place expr) (visited-of state) :key #'equal))
+     (if (not (position (list place expr) (visited-of state) :test #'equal))
          (make-instance 'unified
                         :aliases-place aliases-place
                         :aliases-expr aliases-expr
-                        :visited visited
+                        :visited (list* (list place expr) visited)
                         :env (env-of state))
          (make-instance 'occurs-check
                         :place place
@@ -115,7 +115,7 @@
               (reduce-state ,seed-name . ,xs)
               ,seed-name))))))
 
-(define-unification (user-type place expr state)
+(define-unification (module place expr state)
   (with-accessors* ((place (pfkind free-kind-of)
                            (pnames member-names-of)
                            (ptypes list-of-types))
@@ -150,11 +150,11 @@
                        :env (env-of state)))))
 
 (define-unification (functor place expr state)
-  (with-accessors* ((place (pktypes free-kind-of)
-                           (pkvars free-vars-of)
+  (with-accessors* ((place (pktypes bound-kind-of)
+                           (pkvars bound-vars-of)
                            (pinner inner-type-of))
-                    (place (ektypes free-kind-of)
-                           (ekvars free-vars-of)
+                    (place (ektypes bound-kind-of)
+                           (ekvars bound-vars-of)
                            (einner inner-type-of)))
     (if (and (= (length pktypes)
                 (length ektypes)))
@@ -167,17 +167,23 @@
                        :env (env-of state)))))
 
 (defun unify-something-with-functor (place expr state)
-  (if  (and (= (length (free-kind-of place))
-               (length (free-kind-of expr)))
-            (= (length (member-names-of place))
-               (length (member-names-of (inner-type-of expr)))))
-       (unify-types place (inner-type-of expr))
+  (if  (and (= (length (member-names-of place))
+               (length (member-names-of (inner-type-of expr))))
+            (iter (for type in (bound-kind-of expr))
+                  (for name in (bound-vars-of expr))
+                  (always (and (find type
+                                     (member-types-of place)
+                                     :test #'equal)
+                               (find name
+                                     (member-names-of place)
+                                     :test #'equal)))))
+       (unify-types place (inner-type-of expr) state)
        (make-instance 'unify-error
                       :place place
                       :expr expr
                       :env (env-of state))))
 
-(defmethod unify-types ((place user-type) (expr functor) state)
+(defmethod unify-types ((place module) (expr functor) state)
   (unify-something-with-functor place expr state))
 
 (defmethod unify-types ((place function-type) (expr functor) state)
