@@ -19,7 +19,8 @@
          (make-instance 'occurs-check
                         :place place
                         :expr expr
-                        :visited visited)))
+                        :visited visited
+                        :env (env-of state))))
     (x x)))
 
 (defun resolve-var (state name seen placep)
@@ -57,7 +58,7 @@
 (defmethod unify-types ((place ocl-type)
                         (expr ocl-type)
                         (state unify-state))
-  (make-instance 'unify-error :place place :expr expr))
+  (make-instance 'unify-error :place place :expr expr :env (env-of state)))
 
 (defmacro define-unification ((type-name place-name expr-name state)
                               &body body)
@@ -82,7 +83,7 @@
 (defmethod unify-types ((place ocl-type)
                         (expr variable-type)
                         (state unify-state))
-  (make-instance 'unify-error :place place :expr expr))
+  (make-instance 'unify-error :place place :expr expr :env (env-of state)))
 
 (define-unification (variable-type place expr state)
   (if (equal (name-of place) (name-of expr))
