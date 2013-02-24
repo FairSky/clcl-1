@@ -68,10 +68,6 @@
 (define-unification (native-type place expr state)
   (equal (name-of place) (name-of expr)))
 
-(defmethod unify-types ((place ocl-type)
-                        (expr ocl-type)
-                        (state unify-state)))
-
 (defmethod unify-types ((place variable-type)
                         (expr ocl-type)
                         (state unify-state))
