@@ -68,8 +68,7 @@
         (call-next-method (maybe-resolve-var state place t)
                           (maybe-resolve-var state expr nil)
                           state))
-      (values state
-              nil)))
+      (values state nil)))
 
 (defmethod unify-types ((place ocl-type)
                         (expr ocl-type)
@@ -89,14 +88,20 @@
 
 (def-unify-types (native-type place expr state)
   (if (equal (name-of place) (name-of expr))
-      (values state expr)))
+      (values state expr)
+      (values (make-instance 'unify-error
+                             :place place
+                             :expr expr
+                             :env (env-of state))
+              nil)))
 
 (defmethod unify-types ((place variable-type)
                         (expr ocl-type)
                         (state unify-state))
-  (derive-unify-state 'unified
-                      :aliases-place (list* (cons place expr)
-                                            (aliases-place-of state))))
+  (values (derive-unify-state state
+                              :aliases-place (list* (cons place expr)
+                                                    (aliases-place-of state)))
+          expr))
 
 (defmethod unify-types ((place ocl-type)
                         (expr variable-type)
@@ -108,27 +113,29 @@
           nil))
 
 (def-unify-types (variable-type place expr state)
-  (if (equal (name-of place) (name-of expr))
-      state
+  (if (and (eql (counter-of place) (counter-of expr))
+           (eq (name-of place) (name-of expr)))
+      (values state expr)
       (values (derive-unify-state state
                :aliases-place (list* (cons place expr)
                                      (aliases-place-of state))
                :aliases-expr (list* (cons expr place)
-                                    (aliases-expr-of state))))))
+                                    (aliases-expr-of state)))
+              expr)))
 
 (defun reduce-state-fn (seed expr f places exprs)
   (iter (with seed = seed)
         (for p in places)
         (for e in exprs)
         (if (not (typep seed 'unified))
-            (return (values seed nil)))
+            (return seed))
         (setf seed (funcall f p e seed))
-        (finally (return (values seed expr)))))
+        (finally (return seed))))
 
 (defmacro reduce-state (seed expr &rest fn-and-list-pairs)
   (multiple-value-ematch (values seed fn-and-list-pairs)
     ((_ '())
-     seed)
+     `(values ,seed ,expr))
     ((seed (list* f places exprs xs))
      (with-unique-names (seed-name expr-name)
        `(let* ((,expr-name ,expr)
@@ -142,20 +149,15 @@
               (values ,seed-name nil)))))))
 
 (def-unify-types (module place expr state)
-  (with-accessors* ((place (pfkind free-kind-of)
-                           (pnames member-names-of)
+  (with-accessors* ((place (pnames member-names-of)
                            (ptypes list-of-types))
-                    (expr (efkind free-kind-of)
-                          (enames member-names-of)
+                    (expr (enames member-names-of)
                           (etypes list-of-types)))
-    (if (and (= (length pfkind)
-                (length efkind))
-             (= (length pnames)
-                (length enames)))
-        (values (reduce-state state expr
-                              #'equal pnames enames
-                              #'unify-types ptypes etypes)
-                expr)
+    (if (= (length pnames)
+           (length enames))
+        (reduce-state state expr
+                      #'equal pnames enames
+                      #'unify-types ptypes etypes)
         (values (make-instance 'unify-error
                                :place place
                                :expr expr
@@ -163,14 +165,10 @@
                 nil))))
 
 (def-unify-types (function-type place expr state)
-  (with-accessors* ((place (pkinds free-kind-of)
-                           (ptypes member-types-of))
-                    (expr (ekinds free-kind-of)
-                          (etypes member-types-of)))
-    (if (and (= (length pkinds)
-                (length ekinds))
-             (= (length ptypes)
-                (length etypes)))
+  (with-accessors* ((place (ptypes member-types-of))
+                    (expr (etypes member-types-of)))
+    (if (= (length ptypes)
+           (length etypes))
         (reduce-state state expr #'unify-types ptypes etypes)
         (values (make-instance 'unify-error
                                :place place
@@ -178,58 +176,67 @@
                                :env (env-of state))
                 nil))))
 
-(def-unify-types (functor place expr state)
-  (with-accessors* ((place (pktypes bound-kind-of)
-                           (pkvars bound-vars-of)
-                           (pinner inner-type-of))
-                    (place (ektypes bound-kind-of)
-                           (ekvars bound-vars-of)
-                           (einner inner-type-of)))
-    (if (and (= (length pktypes)
-                (length ektypes)))
-        (reduce-state state expr
-                      #'unify-types pktypes ektypes
-                      #'unify-types (list pinner) (list einner))
-        (values (make-instance 'unify-error
-                               :place place
-                               :expr expr
-                               :env (env-of state))
-                nil))))
-
-(defun unify-something-with-functor (place expr state)
-  (if  (and (= (length (member-names-of place))
-               (length (member-names-of (inner-type-of expr))))
-            (iter (for type in (bound-kind-of expr))
-                  (for name in (bound-vars-of expr))
-                  (always (and (find type
-                                     (member-types-of place)
-                                     :test #'equal)
-                               (find name
-                                     (member-names-of place)
-                                     :test #'equal)))))
-       (unify-types place (inner-type-of expr) state)
-       (values (make-instance 'unify-error
-                              :place place
-                              :expr expr
-                              :env (env-of state))
-               nil)))
-
-(defmethod unify-types ((place module) (expr functor) state)
-  (unify-something-with-functor place expr state))
-
-(defmethod unify-types ((place function-type) (expr functor) state)
-  (unify-something-with-functor place expr state))
-
 (defgeneric functorize (type bound-kinds bound-vars state))
 
 (defmethod functorize ((type ocl-type) bound-kinds bound-vars state)
   nil)
 
-#+ (or)
-(defmethod functorize ((type functor) bound-kinds bound-vars state)
-  (let ((foundp nil))
-    (flet ((f (x y)
-             (let ((foo (unify-types x y state)))
-               ))))
-    (mapcar (lambda (x)
-              ))))
+(defun apply-functor-to-type-list (list bound-vars bound-kinds state)
+  (labels ((rec (bound-vars bound-kinds acc)
+             (if (endp bound-vars)
+                 (nreverse acc)
+                 (let ((kind (first bound-kinds))
+                       (var (first bound-vars)))
+                   (mapcar (lambda (type)
+                             (if (and (typep type 'variable-type)
+                                      (eql (name-of var)
+                                           (name-of type))
+                                      (eql (counter-of var)
+                                           (counter-of type)))
+                                 (multiple-value-call
+                                     (lambda (_ type2)
+                                       (declare (ignore _))
+                                       (rec (rest bound-vars)
+                                            (rest bound-kinds)
+                                            (cons (or type2 type)
+                                                  acc)))
+                                   (unify-types type kind state))
+                                 type))
+                           list)))))
+    (rec bound-vars bound-kinds '())))
+
+(defmethod functorize ((type module) bound-kinds bound-vars state)
+  (let ((types (apply-functor-to-type-list (member-types-of type)
+                                           bound-vars
+                                           bound-vars
+                                           state)))
+    
+    (and (not (equal types (member-types-of type)))
+         (make-instance 'module
+                        :path (path-of type)
+                        :member-types types
+                        :member-names (member-names-of type)
+                        :name (name-of type)))))
+
+(defmethod functorize ((type function-type) bound-kinds bound-vars state)
+  (let ((types (apply-functor-to-type-list (member-types-of type)
+                                           bound-vars
+                                           bound-vars
+                                           state)))
+    (and (not (equal types (member-types-of type)))
+         (make-instance 'function-type
+                        :member-types types
+                        :member-names (member-names-of type)
+                        :name (name-of type)))))
+
+(defmethod functorize ((type variable-type) bound-kinds bound-vars state)
+  (let ((pos (position (cons (name-of type)
+                             (counter-of type))
+                       bound-vars
+                       :key (lambda (x)
+                              (cons (name-of x)
+                                    (counter-of x)))
+                       :test #'equal)))
+    (if pos
+        (elt bound-kinds pos)
+        nil)))

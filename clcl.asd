@@ -6,5 +6,5 @@
    (:file "sum-types")
    (:file "util")
    (:file "env")
-   (:file "expr")
+   (:file "types")
    (:file "unify")))

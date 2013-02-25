@@ -31,4 +31,6 @@
            #:unify-error
            #:occurs-check
            #:unify-state
-           #:ocl-env))
+           #:ocl-env
+           #:simple-name
+           #:functorized-name))
